@@ -1,0 +1,268 @@
+FORMAT: 1A
+HOST: http://www.google.com/api
+
+# API Name
+This API helps you manage your Amazon reviews.
+
+
+# Get Data [GET /get_data]
+
+This is endpoint serves to get reviews from API. 
+
+You must fill in the following parameters
+		
++ api_user (string) - Get from [API Key Generator](https://www.google.com) 268 characters 
+
++ user_accounts (string) - As many user accounts as necessary with a | separator
+
+As with every good action it should return a response. A response always
+bears a status code. Code 200 is great as it means all is green. Response should also include some data from Amazon.
+
+::: note
+	## Example
+	<?php
+		// configuration set here
+		$review_host="localhost";
+		$review_db="review_db";
+		$review_db_user="review_db_user";
+		$review_db_pass="review_db_pass";
+		$api_user="api_user";
+		$user_accounts="user_account1.'|'.user_account2.'|'.user_account3.'|'...user_accountN.'|'...user_accountLast.'|'."; //as many user accounts as necessary with a |
+		$key="[api_key]"; //From API Key Generator - 268 characters
+		// configuration ends here
+		// GET THE DATA
+		$host="http://www.google.com/api/get_data/?api_user=$api_user&users=$user_accounts";
+		$process = curl_init($host);
+		curl_setopt($process, CURLOPT_HTTPHEADER, array('Content-Type: application/json', 'Authorization:'.$key));
+		curl_setopt($process, CURLOPT_TIMEOUT, 30);
+		curl_setopt($process, CURLOPT_POST, 1);
+		/*curl_setopt($process, CURLOPT_POSTFIELDS, $payloadName);*/
+		curl_setopt($process, CURLOPT_RETURNTRANSFER, TRUE);
+		$response = curl_exec($process);
+		curl_close($process);
+		$result=json_decode($response);
+		if($result->success=="1"){
+			$json_datas=$result->datas;
+			$conn = new mysqli($review_host, $review_db_user, $review_db_pass, $review_db);
+			// Check connection
+			if ($conn->connect_error) {
+				die("Connection failed: " . $conn->connect_error);
+			}
+			$user_accounts_arr=explode("|",$user_accounts);
+			$user_accounts_string="'".implode("','",$user_accounts_arr) ."'";
+			$sql="select * from users where name in ($user_accounts_string)";
+			$user_array=array();
+			$sql_result = $conn->query($sql);
+			if ($sql_result->num_rows > 0) {
+				// output data of each row
+				while($row = $sql_result->fetch_assoc()) {
+					$value=$row["id"];
+					$key=$row["name"];
+					$user_array[$key]=$value;
+					//echo "id: " . $row["id"]. " - Name: " . $row["firstname"]. " " .
+					$row["lastname"]. "<br>";
+				}
+			}
+			foreach($user_accounts_arr as $user){
+				$user_id=0;
+				if (array_key_exists($user,$user_array))
+				{
+					$key=$user;
+					$value =$user_array[$key];
+					$user_id=$value;
+				}else{
+					$sql="insert into users(`name`) values ('$user')";
+					$conn->query($sql);
+					$user_id = $conn->insert_id;
+					$user_array[$user]=$user_id;
+				}
+				$datas= $json_datas->$user;
+				foreach($datas as $data){
+					$asin=mysqli_escape_string($conn,$data->ASIN);
+					$marketplace=mysqli_escape_string($conn,$data->MarketPlace);
+					$sku=mysqli_escape_string($conn,$data->Prod_id);
+					$verified=mysqli_escape_string($conn,$data->Verified);
+					$rev_date=mysqli_escape_string($conn,$data->ReviewDate);
+					$rating=mysqli_escape_string($conn,$data->Rating);
+					$reviewer=mysqli_escape_string($conn,$data->ReviewerName);
+					$title=mysqli_escape_string($conn,$data->Title);
+					$content=mysqli_escape_string($conn,$data->ReviewText);
+					$language=mysqli_escape_string($conn,$data->Language);
+					$approved=mysqli_escape_string($conn,$data->display);
+					$company=mysqli_escape_string($conn,$data->Company);
+					$sql="insert into reviews(`user_id`
+					,`asin`,`marketplace`,`sku`,`verified`,`rev_date`,`rating`,`reviewer`,`title`,`co
+					ntent`,`language`,`approved`) values
+					('$user_id','$asin','$marketplace','$sku','$verified','$rev_date','$rating','$rev
+					iewer','$title','$content','$language','$approved')";
+					if( !$conn->query($sql)){
+						echo "<font color='red'>Error: </font>" . $sql . "<br>" . $conn->error ."<hr/>";
+					}
+				}
+			}
+			echo "<font color='blue'>Data has been imported successfully</font>";
+		}elseif($result->error=="1"){
+			echo "<font color='red'>".$result->message."</font>";
+		}
+	?>
+:::
+
+
++ Request (application/json)
+
+	    {
+	        "api_user": "Qwe34trudy67Hf494VbDqL4Tvqvs7YDbwq",
+	        "user_accounts": "user_account1.'|'.user_account2.'|'.user_account3.'|'...user_accountN.'|'...user_accountLast"
+	    }
+
+
++ Response 200 (application/json)
+
+
+	+ Body
+
+        	{
+				"success": "1",
+				"datas": {
+					"user_account1": [
+						{
+							"Company": "user_account1",
+						    "ASIN": "B00JJR08WK",
+						    "MarketPlace": "Amazon IT",
+						    "Prod_id": "SS2CMRBRDI55",
+						    "Verified": "Acquisto verificato",
+						    "ReviewDate": "2014 - 08 - 15",
+						    "Rating": "5",
+						    "ReviewerName": "Ines",
+						    "Title" : "Il ritratto di una grande donna",
+						    "ReviewText": "Il diario di Anais Ninintenso,commovente,vivo e brutalmente onesto.Fitto e pregno di altissimeelucubrazioni,l 'autrice arriva ad un livello di consapevolezza e di intellettoaltissimi,calibrati da una scrittura delicata e potentemente femminile.Particolarmente toccante e realistica la parte nella quale descrive il parto diun feto natomorto.",
+						    "Language": "IT",
+						    "display": "1"
+						},
+						{
+						    "Company": "user_account1",
+						    "ASIN": "B00JJR08 WK",
+						    "MarketPlace": "Amazon IT",
+						    "Prod_id": "SS2CMRBRDI55",
+						    "Verified": "",
+						    "ReviewDate": "2018 - 02 - 07",
+						    "Rating": "1",
+						    "ReviewerName": "VM",
+						    "Title": "una malata di mente che vivendo negli alti salotti della noia ebbe il permesso di scrivere per prima di cose proibite",
+						    "ReviewText": " Se i suoi allampanati pensieri fossero scritti adesso, che il sessou cnormaled antiquato rispetto agli illuminati aggiornamenti deglicesperti, dovrebbe andare a lavorare.Oppure, troverebbe porte pampie ma molta concorrenza.",
+						    "Language": "IT",
+						    "display": "1"
+						},
+						{
+						    "Company": "user_account1",
+						    "ASIN": "B 00 JJR08WK",
+						    "MarketPlace": "Amazon IT",
+						    "Prod_id": "SS2CMRBRDI55",
+						    "Verified": "Acquisto verificato",
+						    "ReviewDate": "2014 - 08 - 04",
+						    "Rating": "5",
+						    "ReviewerName": "misselisabethb ennet",
+						    "Title": "pensieri di una mente affascinante",
+						    "ReviewText": " Premetto che mi sono incuriosita alla vita della scrittrice dopo la lettura delletra lei e Miller.Non ho mai letto i suoi romanzi pi celebri(v.Il delta di venere) ma da subito sono stata affascinata dalla sua scrittura e dalla sua fantasia assolutamente grandiosa.Libro da leggere e rileggere! Essenziale", "
+						    Language": "IT",
+						    "display": "1"
+						}
+					],
+					"user_account2": [
+						{
+						    "Company": "user_account2",
+						    "ASIN": "B00EBWSKUA",
+						    "MarketPlace": "Amazon CA",
+						    "Prod_id": "02. Ci.BA.SSC",
+						    "Verified": "Verified Purchase",
+						    "ReviewDate": "2017 - 01 - 10",
+						    "Rating": "3",
+						    "ReviewerName": "J. Hannem",
+						    "Title": "Three Stars",
+						    "ReviewText": "Bit of a pain to mix - but much cheaper",
+						    "Language": "EN",
+						    "display": " 1 "
+						},
+						{
+						    "Company": "user_account2",
+						    "ASIN": "B00DL1 XV9C",
+						    "MarketPlace": "Amazon CA",
+						    "Prod_id": "08. CM.BA.SSC",
+						    "Verified": "VerifiedPurchase",
+						    "ReviewDate": "2017 - 04 - 10",
+						    "Rating": "5",
+						    "ReviewerName": "Hanpeng",
+						    "Title": "Five Stars",
+						    "ReviewText": "Good",
+						    "Language": "EN",
+						    "display": "1"
+						},
+						{
+						    "Company": "user_account2",
+						    "ASIN": "B00DL1XV9C",
+						    "MarketPlace": "AmazonCA",
+						    "Prod_id": "08. CM.BA.SSC",
+						    "Verified": "VerifiedPurchase", 
+						    "ReviewDate": "2018 - 06 - 29",
+						    "Rating": "1",
+						    "ReviewerName": "CcileBlanger",
+						    "Title": "Payer pour deschantillons ?",
+						    "ReviewText": "5 petitenveloppe chantillon se prix cest vraiment trop cher!",
+						    "Language": "EN",
+						    "display": "1 "
+						}
+					]
+				}
+			}
+
+
+
+# Confirm Data [GET /confirm]
+
+This is endpoint serves to confirm reviews from API. 
+
+You must fill in the following parameters
++ api_user - Get from [API Key Generator](https://www.google.com/api-key-generator) 268 characters 
++ user_accounts - As many user accounts as necessary with a | separator
+
+As with every good action it should return a response. A response always
+bears a status code. Code 200 is great as it means all is green. Response should also include some data from Amazon.
+
+::: note
+	## Example
+	<?php 
+		//GET THE DATA 
+		$api_user="api_user"; 
+		$user_accounts="user_account1.'|'.user_account2.'|'.user_account3.'|'...user_accountN.'|'...user_accountLast.'|'.";  
+		$key="[api_key]"; //From API Key Generator - 268 characters 
+		// configuration ends here 
+		//GET THE DATA  
+		$host="http://www.google.com/api/confirm/?api_user=$api_user&users=$user_accounts"; 
+		process = curl_init($host); 
+		curl_setopt($process, CURLOPT_HTTPHEADER, array('Content-Type: application/json', 'Authorization:'.$key)); 
+		curl_setopt($process, CURLOPT_TIMEOUT, 30); 
+		curl_setopt($process, CURLOPT_POST, 1); 
+		/*curl_setopt($process, CURLOPT_POSTFIELDS, $payloadName);*/ 
+		curl_setopt($process, CURLOPT_RETURNTRANSFER, TRUE); 
+		$result = curl_exec($process); 
+		curl_close($process); 
+		echo $result; 
+	?>
+:::
+
+
++ Request (application/json)
+
+        {
+            "api_user": "Qwe34trudy67Hf494VbDqL4Tvqvs7YDbwq",
+            "user_accounts": "user_account1.'|'.user_account2.'|'.user_account3.'|'...user_accountN.'|'...user_accountLast"
+        }
+
+
++ Response 200 (application/json)
+		
+		{
+			"message": "confirmation message goes here"
+		}
+
+	
